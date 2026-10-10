@@ -104,6 +104,7 @@ async function rePub(
 ): Promise<void> {
   // get active state for clearing badge with navigation
   const tab = getTab(tabId);
+  let kind = "page";
   try {
     await tab.init();
 
@@ -116,6 +117,7 @@ async function rePub(
     await tab.progress(50);
 
     if (capture.type === "pdf") {
+      kind = "pdf";
       await tab.progress(75);
       await sendPdf(capture.pdf, initTitle ?? capture.title, options);
     } else {
@@ -147,7 +149,10 @@ async function rePub(
         .create({
           type: "basic",
           iconUrl: "images/repub_128.png",
-          title: "Conversion to epub failed",
+          title:
+            kind === "pdf"
+              ? "Sending the pdf failed"
+              : "Conversion to epub failed",
           message: msg,
         })
         .catch(() => {
@@ -197,7 +202,8 @@ browser.action.onClicked.addListener((tab) => {
 
 // watch for messages from popup
 browser.runtime.onMessage.addListener((message: unknown) => {
-  const { tabId, title, author } = message as TitleRequest;
+  const { tabId, title, author } = (message ?? {}) as Partial<TitleRequest>;
+  if (typeof tabId !== "number") return;
   keepAlive(() => rePub(tabId, title, author)).catch((ex: unknown) => {
     console.error(ex);
   });
