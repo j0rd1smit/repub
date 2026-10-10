@@ -102,7 +102,7 @@ test("snapshot() makes image urls absolute and fetches them", async () => {
     </body></html>`,
     "https://example.com/post/",
   );
-  const snap = await snapshot(100, 1000);
+  const snap = await snapshot(100, 1000, 10_000);
   expect(snap.url).toBe("https://example.com/post/");
   expect(snap.title).toBe("Page");
   expect(snap.html.startsWith("<!DOCTYPE html>")).toBe(true);
@@ -151,12 +151,21 @@ test("snapshot() makes image urls absolute and fetches them", async () => {
   expect(images.get("https://example.com/cover.png")).toBeNull();
 });
 
+test("snapshot() leaves images to the extension once out of time", async () => {
+  installDom(
+    `<!doctype html><body><img src="/post/img/a.png"></body>`,
+    "https://example.com/",
+  );
+  const snap = await snapshot(100, 1000, 0);
+  expect(snap.images).toEqual([["https://example.com/post/img/a.png", null]]);
+});
+
 test("snapshot() stops collecting images at the limit", async () => {
   installDom(
     `<!doctype html><body><img src="/1.png"><img src="/2.png"><img src="/3.png"></body>`,
     "https://example.com/",
   );
-  const snap = await snapshot(2, 1000);
+  const snap = await snapshot(2, 1000, 10_000);
   expect(snap.images.map(([href]) => href).sort()).toEqual([
     "https://example.com/1.png",
     "https://example.com/2.png",

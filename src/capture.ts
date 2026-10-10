@@ -31,7 +31,10 @@ export type Capture =
 export async function snapshot(
   maxImages: number,
   timeoutMs: number,
+  budgetMs: number,
 ): Promise<Snapshot> {
+  // past this, images are left to the extension so the page answers in time
+  const deadline = Date.now() + budgetMs;
   const base = document.baseURI;
   const resolve = (value: string | null | undefined): string | null => {
     if (!value?.trim()) return null;
@@ -185,10 +188,12 @@ export async function snapshot(
       reader.readAsDataURL(blob);
     });
   const load = async (href: string): Promise<string | null> => {
+    const remaining = Math.min(timeoutMs, deadline - Date.now());
+    if (remaining <= 0) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
-    }, timeoutMs);
+    }, remaining);
     try {
       const resp = await fetch(href, {
         cache: "force-cache",
@@ -224,6 +229,10 @@ export async function snapshot(
 
 const MAX_IMAGES = 500;
 const IMAGE_TIMEOUT_MS = 30_000;
+// how long the page spends fetching images before handing the rest over
+const PAGE_BUDGET_MS = 60_000;
+// a snapshot that takes much longer than its budget isn't coming back
+const SNAPSHOT_TIMEOUT_MS = PAGE_BUDGET_MS + 30_000;
 
 /** fetch a resource from the extension, which has broader host access */
 async function fetchBytes(
@@ -340,16 +349,52 @@ async function capturePdf(tab: browser.tabs.Tab): Promise<Capture | null> {
  * through the same rendering as uploaded mhtml files. Firefox shows pdfs in its
  * own viewer, which extensions can't script, so those are fetched directly.
  */
+/**
+ * run the snapshot in the tab
+ *
+ * A tab that navigates away mid snapshot never answers, so this gives up as
+ * soon as the tab starts loading something else, or after a generous timeout.
+ */
+async function takeSnapshot(
+  tabId: number,
+): Promise<browser.scripting.InjectionResult[]> {
+  let abandon = (_: Error) => {};
+  const abandoned = new Promise<never>((_, reject) => {
+    abandon = reject;
+  });
+  const onUpdated = (
+    updated: number,
+    { status }: browser.tabs._OnUpdatedChangeInfo,
+  ) => {
+    if (updated === tabId && status === "loading") {
+      abandon(new Error("the page navigated away while it was captured"));
+    }
+  };
+  browser.tabs.onUpdated.addListener(onUpdated, { properties: ["status"] });
+  const timer = setTimeout(() => {
+    abandon(new Error("the page took too long to capture"));
+  }, SNAPSHOT_TIMEOUT_MS);
+  try {
+    return await Promise.race([
+      browser.scripting.executeScript({
+        target: { tabId },
+        func: snapshot,
+        args: [MAX_IMAGES, IMAGE_TIMEOUT_MS, PAGE_BUDGET_MS],
+      }),
+      abandoned,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    browser.tabs.onUpdated.removeListener(onUpdated);
+  }
+}
+
 export async function pageCapture(tabId: number): Promise<Capture> {
   const tab = await browser.tabs.get(tabId);
   let snap: Snapshot | undefined;
   let failure: unknown;
   try {
-    const [result] = await browser.scripting.executeScript({
-      target: { tabId },
-      func: snapshot,
-      args: [MAX_IMAGES, IMAGE_TIMEOUT_MS],
-    });
+    const [result] = await takeSnapshot(tabId);
     if (result?.error !== undefined) {
       failure = result.error;
     } else {

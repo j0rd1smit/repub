@@ -1,6 +1,23 @@
 // store active state for navigation
 const activeTabs = new Map<number, Tab>();
 
+/**
+ * note tabs that navigate away mid conversion
+ *
+ * Firefox clears a tab's badge when it navigates, but the rest of a conversion
+ * would set it again on the new page, so the tab clears it once it's done. This
+ * only listens while converting, so navigation doesn't wake the background.
+ */
+function onUpdated(
+  tabId: number,
+  { status }: browser.tabs._OnUpdatedChangeInfo,
+): void {
+  const active = activeTabs.get(tabId);
+  if (status === "loading" && active?.precount) {
+    active.nav = true;
+  }
+}
+
 class Tab {
   #tabId: number;
   nav: boolean = false;
@@ -83,6 +100,9 @@ class Tab {
     this.count -= 1;
     if (!this.count) {
       activeTabs.delete(this.#tabId);
+      if (!activeTabs.size) {
+        browser.tabs.onUpdated.removeListener(onUpdated);
+      }
       if (this.nav) {
         try {
           await browser.action.setBadgeText({
@@ -106,28 +126,10 @@ export function getTab(tabId: number): Tab {
     return tab;
   } else {
     const newTab = new Tab(tabId);
+    if (!activeTabs.size) {
+      browser.tabs.onUpdated.addListener(onUpdated, { properties: ["status"] });
+    }
     activeTabs.set(tabId, newTab);
     return newTab;
   }
 }
-
-// watch for navigation
-browser.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
-  if (frameId === 0) {
-    // only care about root navigation
-    const active = activeTabs.get(tabId);
-    if (active?.precount) {
-      active.nav = true;
-    } else {
-      browser.action
-        .setBadgeText({
-          tabId,
-          text: "",
-        })
-        .catch((ex: unknown) => {
-          const message = ex instanceof Error ? ex.message : "unknown error";
-          console.error(`error setting badge text: ${message}`);
-        });
-    }
-  }
-});

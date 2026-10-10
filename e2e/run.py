@@ -149,6 +149,7 @@ class Extension:
         opts.set_preference("browser.download.useDownloadDir", True)
         opts.set_preference("browser.download.always_ask_before_handling_new_types", False)
         opts.set_preference("devtools.console.stdout.chrome", True)
+        opts.set_preference("devtools.console.stdout.content", True)
         service = Service(os.environ.get("GECKODRIVER") or None, log_output=os.path.join(downloads, "..", "gecko.log"))
         self.driver = webdriver.Firefox(options=opts, service=service)
         self.driver.install_addon(ext_dir, temporary=True)
@@ -228,6 +229,34 @@ class Extension:
         self.driver.switch_to.window(self.ext_handle)
         return badge, sorted(f for f in os.listdir(self.downloads) if not f.endswith(".part"))
 
+    def badge_after_navigating(self, url: str, other: str, midway: bool) -> tuple[str, list[str]]:
+        """navigate the tab to `other` after (or while) capturing `url`, and return its final badge"""
+        for name in os.listdir(self.downloads):
+            os.remove(os.path.join(self.downloads, name))
+        self.run("browser.storage.local.clear()")
+        self.run("browser.storage.local.set({ outputStyle: 'download' })")
+        self.driver.switch_to.new_window("tab")
+        page_handle = self.driver.current_window_handle
+        self.driver.get(url)
+        time.sleep(2)
+        self.driver.switch_to.window(self.ext_handle)
+        tab_id = self.run("browser.tabs.query({}).then((tabs) => tabs.find((t) => t.url === arguments[0])?.id)", url)
+        self.run("browser.runtime.sendMessage({ tabId: arguments[0] })", tab_id)
+        if midway:
+            self.run("browser.tabs.update(arguments[0], { url: arguments[1] })", tab_id, other)
+        deadline = time.time() + (5 if midway else 60)
+        while time.time() < deadline and not [f for f in os.listdir(self.downloads) if not f.endswith(".part")]:
+            time.sleep(0.5)
+        if not midway:
+            time.sleep(1)
+            self.run("browser.tabs.update(arguments[0], { url: arguments[1] })", tab_id, other)
+        time.sleep(2)
+        badge = self.run("browser.action.getBadgeText({ tabId: arguments[0] })", tab_id)
+        self.driver.switch_to.window(page_handle)
+        self.driver.close()
+        self.driver.switch_to.window(self.ext_handle)
+        return badge, sorted(os.listdir(self.downloads))
+
     def quit(self):
         self.driver.quit()
 
@@ -300,6 +329,13 @@ def main() -> int:
         check(badge == "done", f"toolbar click badge is done ({badge})")
         check(files == ["Test Article About Images.epub"], f"toolbar click downloaded the epub ({files})")
 
+        other = f"http://localhost:{site_port}/paper.pdf"
+        badge, files = ext.badge_after_navigating(page, other, midway=False)
+        check(files and badge == "", f"navigating after a capture clears the badge ({badge!r})")
+        badge, files = ext.badge_after_navigating(page, other, midway=True)
+        # the capture gives up on a page that navigated away
+        check(badge == "", f"navigating mid capture leaves no badge ({badge!r}, {files})")
+
         badge, files = ext.capture(page, {"convertTables": True})
         check(badge == "done", f"table conversion badge is done ({badge})")
         if files:
@@ -341,7 +377,10 @@ def main() -> int:
     if failures:
         print(f"\n{len(failures)} failures; firefox log in {work}/gecko.log")
         return 1
-    shutil.rmtree(work, ignore_errors=True)
+    if os.environ.get("E2E_KEEP"):
+        print(f"\nkept {work}")
+    else:
+        shutil.rmtree(work, ignore_errors=True)
     print("\nall passed")
     return 0
 
