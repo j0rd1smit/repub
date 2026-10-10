@@ -185,8 +185,8 @@ ${this.options.tableCss}`;
       const { width, height } = node.getBoundingClientRect();
       document.body.removeChild(div);
 
-      svg.setAttribute("width", width.toFixed());
-      svg.setAttribute("height", height.toFixed());
+      svg.setAttribute("width", Math.ceil(width).toFixed());
+      svg.setAttribute("height", Math.ceil(height).toFixed());
 
       const serial = new XMLSerializer();
       const render = new Image();
