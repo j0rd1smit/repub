@@ -16,7 +16,8 @@
     "export:pack": "rm -f repub.zip && zip -r --filesync repub.zip images/*.png manifest.json popup.html out",
     "export": "bun export:images && bun export:bundle && bun export:pack",
     "pack": "bun lint && bun test --coverage && bun export && publint",
-    "lint:ext": "rm -rf dist && mkdir dist && unzip -q repub.zip -d dist && bunx web-ext@8 lint --source-dir dist"
+    "lint:ext": "rm -rf dist && mkdir dist && unzip -q repub.zip -d dist && bunx web-ext@8 lint --source-dir dist",
+    "e2e": "python3 e2e/run.py dist"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

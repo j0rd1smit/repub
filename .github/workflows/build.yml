@@ -17,3 +17,19 @@ jobs:
       - run: bun lint
       - run: bun test
       - run: bun export:bundle
+
+  # package the extension, lint it the way addons.mozilla.org does, and drive it
+  # through a real firefox; the runner image ships firefox and geckodriver
+  firefox:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+      - run: bun install --frozen-lockfile
+      - run: bun export
+      - run: bun lint:ext
+      - run: pip install selenium pillow
+      - run: firefox --version
+      - run: bun e2e
