@@ -93,6 +93,7 @@ test("snapshot() makes image urls absolute and fetches them", async () => {
     `<!doctype html><html><head><title>Page</title>
     <meta property="og:image" content="/cover.png"></head><body>
     <img id="plain" src="img/a.png">
+    <img id="native" loading="lazy" src="img/n.png" resource="/wiki/File:n.png">
     <img id="set" srcset="img/s,w_400.png 400w, img/s,w_800.png 800w">
     <img id="lazy" src="data:image/gif;base64,R0lGOD" data-src="img/lazy.png">
     <picture><source srcset="img/pic.webp 1x"><img src="img/pic.png"></picture>
@@ -111,6 +112,8 @@ test("snapshot() makes image urls absolute and fetches them", async () => {
   expect(doc.getElementById("plain")?.getAttribute("src")).toBe(
     "https://example.com/post/img/a.png",
   );
+  // so defuddle doesn't take the resource for the image
+  expect(doc.getElementById("native")?.hasAttribute("loading")).toBe(false);
   // commas inside urls don't split candidates
   expect(doc.getElementById("set")?.getAttribute("srcset")).toBe(
     "https://example.com/post/img/s,w_400.png 400w, https://example.com/post/img/s,w_800.png 800w",
@@ -132,6 +135,7 @@ test("snapshot() makes image urls absolute and fetches them", async () => {
   expect([...images.keys()].sort()).toEqual(
     [
       "https://example.com/post/img/a.png",
+      "https://example.com/post/img/n.png",
       // the widest srcset candidate, since nothing was displayed
       "https://example.com/post/img/s,w_800.png",
       // the lazy source rather than its placeholder

@@ -127,6 +127,12 @@ export async function snapshot(
     for (const attr of ["data-src", "data-lazy-src", "data-original"]) {
       want(resolve(img.getAttribute(attr)));
     }
+    // natively lazy images already have their real src, but defuddle treats
+    // them like script lazy loaders and swaps in any url-like attribute, such
+    // as the file page wikipedia puts in `resource`
+    if (resolve(img.getAttribute("src"))) {
+      img.removeAttribute("loading");
+    }
     want(largest(img.getAttribute("data-srcset")));
   }
   for (const source of root.querySelectorAll("source")) {

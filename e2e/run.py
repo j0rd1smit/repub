@@ -99,7 +99,7 @@ def article(cross_origin: str) -> str:
 {body}
 <figure><svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="red"/></svg><figcaption>inline svg</figcaption></figure>
 {PARA * 20}
-<figure><img loading="lazy" src="img/native.png" alt="native" width="400" height="300"><figcaption>native lazy image</figcaption></figure>
+<figure><img loading="lazy" src="img/native.png" resource="https://example.org/wiki/File:native.png" alt="native" width="400" height="300"><figcaption>native lazy image</figcaption></figure>
 {PARA}
 </article></main>
 <script>console.log("page script")</script>
