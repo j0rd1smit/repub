@@ -61,3 +61,29 @@ export function errString(err: unknown): string {
     return "unknown object error";
   }
 }
+
+const extensionTypes: Record<string, string> = {
+  epub: "application/epub+zip",
+  pdf: "application/pdf",
+  md: "text/markdown",
+  markdown: "text/markdown",
+  mhtml: "multipart/related",
+  mht: "multipart/related",
+};
+
+/**
+ * the type of an uploaded file
+ *
+ * Firefox takes file types from the operating system, which often doesn't know
+ * markdown or mhtml, so the extension decides when it's known.
+ */
+export function fileType({
+  name,
+  type,
+}: {
+  name: string;
+  type: string;
+}): string {
+  const ext = /\.([^./]+)$/.exec(name)?.[1]?.toLowerCase();
+  return (ext && extensionTypes[ext]) || type;
+}

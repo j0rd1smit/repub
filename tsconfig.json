@@ -9,7 +9,7 @@
     "incremental": true,
     "target": "esnext",
     "moduleResolution": "bundler",
-    "types": ["chrome", "bun", "node"],
+    "types": ["firefox-webext-browser", "bun", "node"],
     "noEmit": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

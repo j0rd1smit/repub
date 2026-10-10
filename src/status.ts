@@ -13,11 +13,11 @@ class Tab {
 
   async init(): Promise<void> {
     try {
-      await chrome.action.setBadgeBackgroundColor({
+      await browser.action.setBadgeBackgroundColor({
         tabId: this.#tabId,
         color: "#000000",
       });
-      await chrome.action.setBadgeText({
+      await browser.action.setBadgeText({
         tabId: this.#tabId,
         text: "0%",
       });
@@ -28,7 +28,7 @@ class Tab {
 
   async progress(perc: number): Promise<void> {
     try {
-      await chrome.action.setBadgeText({
+      await browser.action.setBadgeText({
         tabId: this.#tabId,
         text: `${perc.toFixed()}%`,
       });
@@ -39,7 +39,7 @@ class Tab {
 
   async complete(message: string): Promise<void> {
     try {
-      await chrome.action.setBadgeText({
+      await browser.action.setBadgeText({
         tabId: this.#tabId,
         text: message,
       });
@@ -51,11 +51,11 @@ class Tab {
   async error(): Promise<void> {
     try {
       await Promise.all([
-        chrome.action.setBadgeText({
+        browser.action.setBadgeText({
           tabId: this.#tabId,
           text: "err",
         }),
-        chrome.action.setBadgeBackgroundColor({
+        browser.action.setBadgeBackgroundColor({
           tabId: this.#tabId,
           color: "#d62626",
         }),
@@ -69,7 +69,7 @@ class Tab {
     this.precount -= 1;
     if (!this.precount && this.nav) {
       try {
-        await chrome.action.setBadgeText({
+        await browser.action.setBadgeText({
           tabId: this.#tabId,
           text: "",
         });
@@ -85,7 +85,7 @@ class Tab {
       activeTabs.delete(this.#tabId);
       if (this.nav) {
         try {
-          await chrome.action.setBadgeText({
+          await browser.action.setBadgeText({
             tabId: this.#tabId,
             text: "",
           });
@@ -112,14 +112,14 @@ export function getTab(tabId: number): Tab {
 }
 
 // watch for navigation
-chrome.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
+browser.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
   if (frameId === 0) {
     // only care about root navigation
     const active = activeTabs.get(tabId);
     if (active?.precount) {
       active.nav = true;
     } else {
-      chrome.action
+      browser.action
         .setBadgeText({
           tabId,
           text: "",

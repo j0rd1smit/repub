@@ -8,7 +8,7 @@ const error = document.getElementById("error")! as HTMLSpanElement;
 button.addEventListener("click", () => {
   button.disabled = true;
   error.innerText = "";
-  chrome.tabs
+  browser.tabs
     .query({
       active: true,
       currentWindow: true,
@@ -21,7 +21,7 @@ button.addEventListener("click", () => {
             title: title.value.trim() || undefined,
             author: author.value.trim() || undefined,
           };
-          await chrome.runtime.sendMessage(msg);
+          await browser.runtime.sendMessage(msg);
           window.close();
         } finally {
           button.disabled = false;

@@ -1,9 +1,14 @@
 import { fromByteArray } from "base64-js";
 import { v4 as uuidv4 } from "uuid";
 
-async function loadImage(
-  url: string,
-): Promise<{ url: string; mime: string; content: Uint8Array } | null> {
+/** a resource to bundle alongside the page */
+export interface MhtmlAsset {
+  readonly url: string;
+  readonly mime: string;
+  readonly content: Uint8Array;
+}
+
+async function loadImage(url: string): Promise<MhtmlAsset | null> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -40,17 +45,20 @@ function encodePart(
   return lines;
 }
 
-export async function toMhtml(
+/** bundle an html page and its already loaded assets as mhtml */
+export function toMhtmlBytes(
   fileName: string,
   html: string,
-  images: string[],
-): Promise<Uint8Array> {
+  assets: readonly MhtmlAsset[],
+  subject: string = fileName,
+): Uint8Array {
   const boundary = uuidv4();
 
   const lines = [
     "From: <Created by rePub>",
     `Snapshot-Content-Location: ${fileName}`,
-    `Subject: ${fileName}`,
+    // headers are a single line
+    `Subject: ${subject.replace(/\s+/g, " ")}`,
     `Date: ${new Date().toDateString()}`,
     "MIME-Version: 1.0",
     "Content-Type: multipart/related;",
@@ -62,13 +70,29 @@ export async function toMhtml(
   const enc = new TextEncoder();
   lines.push(...encodePart(enc.encode(html), "text/html", fileName, boundary));
 
-  // add all images that were linked
-  const loaded = await Promise.all(images.map(loadImage));
-  for (const { url, mime, content } of loaded.filter((d) => d !== null)) {
-    lines.push(...encodePart(content, mime, url, boundary));
+  const included = new Set<string>([fileName]);
+  for (const { url, mime, content } of assets) {
+    if (!included.has(url)) {
+      included.add(url);
+      lines.push(...encodePart(content, mime, url, boundary));
+    }
   }
 
   // footer for completion
   lines.push(`------MultipartBoundary--${boundary}------`);
   return enc.encode(lines.join("\r\n"));
+}
+
+/** bundle an html page as mhtml, fetching the images it links to */
+export async function toMhtml(
+  fileName: string,
+  html: string,
+  images: string[],
+): Promise<Uint8Array> {
+  const loaded = await Promise.all(images.map(loadImage));
+  return toMhtmlBytes(
+    fileName,
+    html,
+    loaded.filter((d) => d !== null),
+  );
 }

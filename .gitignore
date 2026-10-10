@@ -18,4 +18,4 @@ node_modules
 /scripts
 /target
 /pkg
-/images
+/images/dist

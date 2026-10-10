@@ -69,7 +69,7 @@ import {
 import { analyzePdfMargins } from "../src/pdf-trim";
 import { render } from "../src/render";
 import { uploadEpub, uploadPdf } from "../src/upload";
-import { sleep } from "../src/utils";
+import { fileType, sleep } from "../src/utils";
 import ButtonSelection from "./button-selection";
 import CheckboxSelection from "./checkbox-selection";
 import CssEditor from "./css-editor";
@@ -92,7 +92,7 @@ const unknownOpts: Partial<Options> = Object.fromEntries(
 
 async function getToken(code: string, authHost: string): Promise<string> {
   // This is for testing in dev mode
-  if (window.chrome?.runtime?.id) {
+  if (globalThis.browser?.runtime?.id) {
     return await register(code, { authHost });
   } else {
     await sleep(1000);
@@ -134,9 +134,10 @@ async function uploadFile(deviceToken: string, file: File): Promise<void> {
   // strip extension up to 4 characters
   const file_title = file.name.replace(/\.[^/.]{0,4}$/, "");
   const [buff, opts] = await Promise.all([file.arrayBuffer(), getOptions()]);
-  if (file.type === "application/epub+zip") {
+  const type = fileType(file);
+  if (type === "application/epub+zip") {
     await uploadEpub(new Uint8Array(buff), file_title, deviceToken, opts);
-  } else if (file.type === "application/pdf") {
+  } else if (type === "application/pdf") {
     const pdf = new Uint8Array(buff);
     let zoom: Partial<PutOptions> = {};
     if (opts.trimPdf) {
@@ -147,10 +148,10 @@ async function uploadFile(deviceToken: string, file: File): Promise<void> {
       }
     }
     await uploadPdf(pdf, file_title, deviceToken, opts, zoom);
-  } else if (file.type === "multipart/related") {
+  } else if (type === "multipart/related") {
     const { epub, title = file_title } = await render(buff, opts);
     await uploadEpub(epub, title, deviceToken, opts);
-  } else if (file.type === "text/markdown") {
+  } else if (type === "text/markdown") {
     // convert markdown to html and extract image URLs
     const dec = new TextDecoder();
     const images: string[] = [];
@@ -165,7 +166,7 @@ async function uploadFile(deviceToken: string, file: File): Promise<void> {
     // convert html and images into mhtml to utilize the same rendering code
     const mhtml = await toMhtml(file.name, html, images);
     const { epub, title = file_title } = await render(
-      mhtml.buffer as ArrayBuffer,
+      mhtml,
       opts,
       file_title,
       undefined,
@@ -173,7 +174,7 @@ async function uploadFile(deviceToken: string, file: File): Promise<void> {
     );
     await uploadEpub(epub, title, deviceToken, opts);
   } else {
-    throw new Error(`unknown file type: ${file.type}`);
+    throw new Error(`unknown file type: ${type || file.name}`);
   }
 }
 
@@ -418,9 +419,9 @@ function CloseImages({
       value={imageHrefSimilarityThreshold !== 0}
       onToggle={onToggle}
       title="Match Close Images"
-      caption={`Due to a bug in chrome, and potentially other factors,
-      capturing the page may get a different image than the ones that appear in
-      the captured html. Selecting this causes the extension to do a more
+      caption={`Pages can refer to images by slightly different urls
+      than the ones that were actually fetched, for instance when an image is
+      resized or lazily loaded. Selecting this causes the extension to do a more
       expensive search for close image urls it has, and uses those images
       instead. If images you expect to be present are missing, this may help,
       if images seem out of context, consider disabling this.`}
@@ -774,13 +775,6 @@ function EpubOptions({
         extension will first prompt for the title and author you want to set."
         opts={opts}
         setOpts={setOpts}
-        onChange={(val) => {
-          chrome.action
-            .setPopup({ popup: val ? "popup.html" : "" })
-            .catch((err) => {
-              console.error("couldn't set popup", err);
-            });
-        }}
       />
     </Stack>
   );
@@ -1238,9 +1232,8 @@ function DevicePicker({
         },
       ]}
       title="reMarkable Model"
-      caption="Which reMarkable you read on. Everything else here is fitted to
-      this screen, and it sets the paper sizes offered when printing to
-      reMarkable."
+      caption="Which reMarkable you read on. Trimming PDF margins fits pages
+      to this screen."
       collapsible={collapsible}
     />
   );
@@ -1278,7 +1271,7 @@ function UploadOptions({
         title="Trim PDF Margins"
         caption="Zoom PDFs past their predominantly white margins so the content
         fills your reMarkable's screen, best for academic papers. Applies one
-        document-wide fit to any PDF you upload or print, and doesn't alter the
+        document-wide fit to any PDF you upload or send, and doesn't alter the
         file itself."
       />
       <TagsSelector tags={opts.tags} setOpts={setOpts} />
@@ -1354,7 +1347,7 @@ function ApiUrlsSection({
 
   // check permissions for each non-default URL individually
   useEffect(() => {
-    if (!globalThis.chrome?.permissions) return;
+    if (!globalThis.browser?.permissions) return;
     let stale = false;
     // deduplicate origins so we only call contains once per unique origin
     const originToKeys = new Map<string, ApiUrlKey[]>();
@@ -1375,7 +1368,7 @@ function ApiUrlsSection({
       }
     }
     for (const [origin, keys] of originToKeys) {
-      chrome.permissions
+      browser.permissions
         .contains({ origins: [origin] })
         .then((granted) => {
           if (stale) return;
@@ -1412,7 +1405,7 @@ function ApiUrlsSection({
       }
     }
     if (origins.size === 0) return;
-    chrome.permissions
+    browser.permissions
       .request({ origins: [...origins] })
       .then((granted) => {
         if (granted) {
@@ -1590,7 +1583,7 @@ export default function OptionsPage(): ReactElement {
       "application/epub+zip": [".epub"],
       "application/pdf": [".pdf"],
       "text/markdown": [".md"],
-      "multipart/related": [".mhtml"],
+      "multipart/related": [".mhtml", ".mht"],
     },
     multiple: false,
     noClick: true,
@@ -1604,7 +1597,7 @@ export default function OptionsPage(): ReactElement {
         <div {...getRootProps()} style={{ minHeight: "100vh" }}>
           <input
             type="file"
-            accept="application/epub+zip,application/pdf,text/markdown,multipart/related"
+            accept="application/epub+zip,application/pdf,text/markdown,multipart/related,.epub,.pdf,.md,.mhtml,.mht"
             style={{ display: "none" }}
             {...getInputProps()}
           />

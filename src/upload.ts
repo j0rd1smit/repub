@@ -16,7 +16,7 @@ function getApi(
     // caching the promise, not the api, keeps concurrent uploads on a single
     // instance, whose mutex then serializes their root updates
     const pending = (async () => {
-      const { [CACHE_KEY]: cache } = await chrome.storage.local.get(CACHE_KEY);
+      const { [CACHE_KEY]: cache } = await browser.storage.local.get(CACHE_KEY);
       return await remarkable(deviceToken, {
         maxCacheSize,
         cache: cache as string,
@@ -72,7 +72,7 @@ async function upload(
   };
   const api = await getApi(deviceToken, 1_000_000, authHost, rawHost);
   await put(api, title, payload, opts);
-  await chrome.storage.local.set({ [CACHE_KEY]: api.dumpCache() });
+  await browser.storage.local.set({ [CACHE_KEY]: api.dumpCache() });
 }
 
 export function uploadEpub(

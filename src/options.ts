@@ -34,6 +34,13 @@ const mockStorage: Storage = {
   },
 };
 
+// the extension's storage, or local storage when developing the options page
+function defaultStorage(): Storage {
+  return (
+    (globalThis.browser?.storage?.local as Storage | undefined) ?? mockStorage
+  );
+}
+
 export type OutputStyle = "upload" | "download";
 export type ImageHandling = "strip" | "filter" | "keep";
 export type Orientation = "portrait" | "landscape";
@@ -146,7 +153,7 @@ export const defaultOptions: Options = {
 const retired = { pdfTrimDevice: null as DeviceModel | null };
 
 export async function getOptions({
-  storage = globalThis.chrome?.storage?.local ?? mockStorage,
+  storage = defaultStorage(),
 }: {
   storage?: Storage;
 } = {}): Promise<Options> {
@@ -171,9 +178,7 @@ export type SetOptions = (options: Partial<Options>) => void;
 
 export async function setOptions(
   opts: Partial<Options>,
-  {
-    storage = globalThis.chrome?.storage?.local ?? mockStorage,
-  }: { storage?: Storage } = {},
+  { storage = defaultStorage() }: { storage?: Storage } = {},
 ): Promise<void> {
   await storage.set(opts);
 }
