@@ -76,8 +76,7 @@ export interface UploadOptions extends FontOption {
   tags: string;
   textAlignment: "left" | "justify";
   viewBackgroundFilter: "off" | "fullpage" | null;
-  // the reMarkable we're sending to: the papers offered when printing, and the
-  // screen trimming fits pdfs to
+  // the reMarkable we're sending to, whose screen trimming fits pdfs to
   device: DeviceModel;
   // zoom pdfs past their white margins
   trimPdf: boolean;

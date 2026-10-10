@@ -36,9 +36,9 @@ function withTimeout<T>(
 let workerReady = false;
 function ensureWorker(): void {
   if (!workerReady) {
-    // ./pdf.worker.js is emitted next to options.js by its own bun build entry
-    // (see the export:bundle script); loading from our own origin keeps the
-    // default MV3 CSP happy
+    // ./pdf.worker.js is emitted next to options.js and background.js (see the
+    // export:bundle script); loading from our own origin keeps the default
+    // MV3 CSP happy
     GlobalWorkerOptions.workerPort = new Worker(
       new URL("./pdf.worker.js", import.meta.url),
       { type: "module" },
