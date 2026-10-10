@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
 import { performance } from "node:perf_hooks";
-import { assert, errString, safeFilename, sleep, timeout } from "./utils";
+import {
+  assert,
+  errString,
+  fileType,
+  safeFilename,
+  sleep,
+  timeout,
+} from "./utils";
 
 test("sleep()", async () => {
   const first = performance.now();
@@ -48,4 +55,21 @@ test("errString()", () => {
   expect(errString(() => undefined)).toBe("function error: ");
   expect(errString(new Error("custom error"))).toBe("Error: custom error");
   expect(errString({})).toBe("unknown object error");
+});
+
+test("fileType() prefers known extensions to the reported type", () => {
+  expect(fileType({ name: "page.mhtml", type: "" })).toBe("multipart/related");
+  expect(fileType({ name: "page.MHT", type: "message/rfc822" })).toBe(
+    "multipart/related",
+  );
+  expect(fileType({ name: "notes.md", type: "text/plain" })).toBe(
+    "text/markdown",
+  );
+  expect(fileType({ name: "book.epub", type: "" })).toBe(
+    "application/epub+zip",
+  );
+  expect(fileType({ name: "scan", type: "application/pdf" })).toBe(
+    "application/pdf",
+  );
+  expect(fileType({ name: "image.png", type: "image/png" })).toBe("image/png");
 });
