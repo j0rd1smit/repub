@@ -175,8 +175,25 @@ class Extension:
             *args,
         )
 
-    def capture(self, url: str, options: dict, timeout: float = 60) -> tuple[str, list[str]]:
-        """open url, send it through the extension, and return the badge and downloads"""
+    def click_action(self):
+        """click the extension's toolbar button, as a user would"""
+        with self.driver.context(self.driver.CONTEXT_CHROME):
+            self.driver.execute_script(
+                """
+                const wid = arguments[0].toLowerCase().replace(/[^a-z0-9_-]/g, "_") + "-browser-action";
+                CustomizableUI.addWidgetToArea(wid, CustomizableUI.AREA_NAVBAR);
+                const node = document.getElementById(wid);
+                (node.querySelector(".unified-extensions-item-action-button") ?? node).click();
+                """,
+                EXT_ID,
+            )
+
+    def capture(self, url: str, options: dict, timeout: float = 60, click: bool = False) -> tuple[str, list[str]]:
+        """open url, send it through the extension, and return the badge and downloads
+
+        By default this sends the message the title popup does; with `click` it
+        clicks the toolbar button instead.
+        """
         for name in os.listdir(self.downloads):
             os.remove(os.path.join(self.downloads, name))
         self.run("browser.storage.local.clear()")
@@ -190,7 +207,12 @@ class Extension:
         tab_id = self.run(
             "browser.tabs.query({}).then((tabs) => tabs.find((t) => t.url === arguments[0])?.id)", url
         )
-        self.run("browser.runtime.sendMessage({ tabId: arguments[0] })", tab_id)
+        if click:
+            self.driver.switch_to.window(page_handle)
+            self.click_action()
+            self.driver.switch_to.window(self.ext_handle)
+        else:
+            self.run("browser.runtime.sendMessage({ tabId: arguments[0] })", tab_id)
 
         deadline = time.time() + timeout
         badge = ""
@@ -273,6 +295,10 @@ def main() -> int:
             check(COLORS["pic-fallback"] not in colors, "picture uses its source, not the fallback")
             check("Jane Tester" in section, "epub has the author")
             check("<table" in section, "epub keeps the table")
+
+        badge, files = ext.capture(page, {}, click=True)
+        check(badge == "done", f"toolbar click badge is done ({badge})")
+        check(files == ["Test Article About Images.epub"], f"toolbar click downloaded the epub ({files})")
 
         badge, files = ext.capture(page, {"convertTables": True})
         check(badge == "done", f"table conversion badge is done ({badge})")
